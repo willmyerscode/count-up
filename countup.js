@@ -11,6 +11,9 @@
       fromCode: '[data-wm-plugin="countup"]',
       fromAnchors: 'a[href*="#wm-countup"], a[href*="#wmcountup"]',
     },
+    defaultSettings: {
+      animateOnDOMChanges: false
+    }
   };
 
   // Utility Functions
@@ -271,6 +274,12 @@
     /*This should handle Weglot language changes */
     setupMutationObserver() {
       const observer = new MutationObserver(mutations => {
+        // Get global settings or use defaults
+        const settings = {
+          ...CONFIG.defaultSettings,
+          ...(window.wmCountUpSettings || {})
+        };
+
         mutations.forEach(mutation => {
           // Clean up removed nodes
           mutation.removedNodes.forEach(node => {
@@ -294,18 +303,25 @@
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) {
               // Element node
-              // Check the node itself
               if (node.matches && node.matches(CONFIG.selectors.fromCode)) {
-                this.createInstance(node);
+                if (settings.animateOnDOMChanges) {
+                  this.createInstance(node);
+                } else {
+                  // Just set the final number without animation
+                  this.setFinalNumber(node);
+                }
               }
               // Check child nodes
               const countupElements = node.querySelectorAll(
                 CONFIG.selectors.fromCode
               );
               countupElements.forEach(el => {
-                // Always create new instance for added elements
                 if (!el.wmCountUp) {
-                  this.createInstance(el);
+                  if (settings.animateOnDOMChanges) {
+                    this.createInstance(el);
+                  } else {
+                    this.setFinalNumber(el);
+                  }
                 }
               });
             }
@@ -437,6 +453,27 @@
         element.classList.remove("loaded");
       });
       this.instances.clear();
+    }
+
+    setFinalNumber(element) {
+      const parsedValue = Utils.parseValue(element);
+      const originalValue = element.dataset.originalValue || parsedValue.value;
+      const options = {
+        decimals: (originalValue.split(".")[1] || "").length,
+        localeString: element.dataset.locale || "en-US",
+        hasSeperator: element.dataset.hasSeperator !== "false",
+        suffix: parsedValue.suffix || ""
+      };
+      
+      const finalNumber = NumberFormatter.formatNumber(
+        originalValue,
+        options.decimals,
+        options.localeString,
+        options.hasSeperator
+      );
+      
+      element.textContent = `${finalNumber}${options.suffix}`;
+      element.classList.add("loaded");
     }
   }
 
